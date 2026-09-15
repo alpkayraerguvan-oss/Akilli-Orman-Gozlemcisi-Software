@@ -189,7 +189,8 @@ FALSE_RE = re.compile(
 )
 OVERVIEW_RE = re.compile(
     r"(?i)sistem\s+nedir|sistem\s+hakkında|sistemi.{0,40}anlat|sistem\s+nasıl|"
-    r"aog\s+nedir|ürün\s+nedir|sistem\s+ne\s+işe"
+    r"aog\s+nedir|ürün\s+nedir|sistem\s+ne\s+işe|"
+    r"proje.{0,40}hakkında|hakkında bilgi|\baog\b.{0,20}nedir"
 )
 INGREDIENT_Q_RE = re.compile(
     r"(?i)içeri|malzeme|bileşen|nelerden oluş|hangi malzeme|aloe|ksantan|pirinç kabuğu|yumurta kabuğu"
@@ -562,33 +563,89 @@ def looks_like_scratch(text, question=""):
     return latin >= 24 and turkish < 3
 
 
-def fallback_for(question):
-    q = str(question or "").casefold()
-    if "kullanıcı" in q or "kac kullan" in q or "kaç kullan" in q:
-        return secrets.choice(REPLY_USER_N)
-    if INGREDIENT_Q_RE.search(q):
-        return secrets.choice(REPLY_INGREDIENTS)
-    if SHORT_Q_RE.search(q):
-        return secrets.choice(REPLY_SHORT)
-    if "alarm" in q or "ntfy" in q or "eşik" in q or "esik" in q:
-        return secrets.choice(REPLY_ALARMS)
-    if "kaplama" in q or "karışım" in q or "karisim" in q:
-        return secrets.choice(REPLY_COATS)
-    return secrets.choice(REPLY_SYSTEMS)
+ASK_AGAIN = "Ne sormak istiyorsun? Kutu, alarm kuralı veya kaplama yaz."
+FACT_HEAD_RE = re.compile(
+    r"^(ÖZET|ÜRÜN|KUTU|KAPLAMA|ALARM|ASİSTAN|ML|YAZILIM|VERİCİ|ALICI|Neden|Açık|Akış|Donanım|Kim|Saha)\s*:\s*",
+    re.I,
+)
+MESH_HEAD_RE = re.compile(r"^MESH\b[^:]*:\s*", re.I)
 
 
-def md_reply(question):
-    facts = read_facts()
-    q = str(question or "").casefold()
-    if not facts:
-        return fallback_for(question)
+def fold_q(text):
+    return str(text or "").replace("İ", "i").replace("I", "ı").casefold()
+
+
+def thin_question(question):
+    blob = str(question or "").strip()
+    if not blob:
+        return True
+    return len(re.findall(r"[A-Za-zçğıöşüÇĞİÖŞÜ]", blob)) < 3
+
+
+def strip_fact_head(text):
+    blob = str(text or "").strip()
+    if re.match(r"^ASİSTAN\s*:", blob, flags=re.I):
+        return re.sub(r"^ASİSTAN\s*:\s*", "Asistan. ", blob, count=1, flags=re.I).strip()
+    blob = FACT_HEAD_RE.sub("", blob, count=1)
+    return MESH_HEAD_RE.sub("", blob, count=1).strip()
+
+
+def fact_paras(facts):
     skip_head = ("Sen AOG", "CEVAP:", "YAZIM:")
     paras = []
-    for block in facts.split("\n\n"):
+    for block in str(facts or "").split("\n\n"):
         block = block.strip()
         if not block or block.startswith(skip_head):
             continue
         paras.append(block)
+    return paras
+
+
+def take_sentences(text, n=4):
+    bits = re.split(r"(?<=[.!?])\s+", strip_fact_head(text))
+    return " ".join(bits[:n]).strip()
+
+
+def overview_reply(facts=None):
+    paras = fact_paras(facts if facts is not None else read_facts())
+    for block in paras:
+        if strip_fact_head(block).startswith("AOG hibrit"):
+            return take_sentences(block, 4)
+    for block in paras:
+        if block.startswith("ÜRÜN:"):
+            return take_sentences(block, 4)
+    return REPLY_SYSTEMS[0]
+
+
+def fallback_for(question):
+    if thin_question(question):
+        return ASK_AGAIN
+    q = str(question or "").casefold()
+    if "kullanıcı" in q or "kac kullan" in q or "kaç kullan" in q:
+        return REPLY_USER_N[0]
+    if INGREDIENT_Q_RE.search(q):
+        return REPLY_INGREDIENTS[0]
+    if SHORT_Q_RE.search(q):
+        return REPLY_SHORT[0]
+    if "alarm" in q or "ntfy" in q or "eşik" in q or "esik" in q:
+        return REPLY_ALARMS[0]
+    if "kaplama" in q or "karışım" in q or "karisim" in q:
+        return REPLY_COATS[0]
+    return overview_reply()
+
+
+def md_reply(question):
+    if thin_question(question):
+        return ASK_AGAIN
+    facts = read_facts()
+    q = fold_q(question)
+    if not facts:
+        return fallback_for(question)
+    if looks_like_overview_question(question):
+        text = overview_reply(facts)
+        if text:
+            return text
+    paras = fact_paras(facts)
     head_map = (
         ("ALARM:", re.compile(r"alarm|ntfy|eşik|esik")),
         ("KAPLAMA:", re.compile(r"kaplama|karışım|karisim|aloe|ksantan")),
@@ -596,27 +653,32 @@ def md_reply(question):
         ("ML:", re.compile(r"sklearn|öğrenme|ogrenme|makine")),
         ("ASİSTAN:", re.compile(r"\basistan\b|\bkip\b")),
         ("MESH", re.compile(r"\bmesh\b")),
-        ("ÖZET:", re.compile(r"\bnedir\b|\bsistem\b|\baog\b|\bproje\b")),
+        ("ÖZET:", re.compile(r"nedir|sistem|aog|proje|hakkında bilgi")),
     )
     for head, pat in head_map:
-        if pat.search(q):
-            for block in paras:
-                if block.upper().startswith(head):
-                    bits = re.split(r"(?<=[.!?])\s+", block)
-                    text = " ".join(bits[:4]).strip()
-                    if text:
-                        return text
+        if not pat.search(q):
+            continue
+        if head == "ÖZET:":
+            text = overview_reply(facts)
+            if text:
+                return text
+        for block in paras:
+            if block.upper().startswith(head):
+                text = take_sentences(block, 4)
+                if text:
+                    return text
     keys = [w for w in re.findall(r"[a-zçğıöşü0-9]+", q, flags=re.I) if len(w) > 3]
     best = ""
     best_n = 0
     for block in paras:
+        if block.startswith("ÖZET:"):
+            continue
         n = sum(1 for w in keys if w in block.casefold())
         if n > best_n:
             best_n = n
             best = block
     if best and best_n:
-        bits = re.split(r"(?<=[.!?])\s+", best)
-        text = " ".join(bits[:4]).strip()
+        text = take_sentences(best, 4)
         if text:
             return text
     return fallback_for(question)

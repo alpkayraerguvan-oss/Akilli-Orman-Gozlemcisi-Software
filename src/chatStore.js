@@ -148,8 +148,52 @@ const REPLY_SHORT = ["LoRa kutu, kaplama.", "Kutu, LoRa, kaplama."];
 const INGREDIENT_Q_RE = /içeri|malzeme|bileşen|nelerden oluş|hangi malzeme|aloe|ksantan|pirinç kabuğu|yumurta kabuğu/i;
 const SHORT_Q_RE = /3\s*kelime|üç\s*kelime|kısaca|özetle|tek cümle/i;
 
-function pickOne(list) {
-  return list[Math.floor(Math.random() * list.length)];
+function thinQuestion(question) {
+  const blob = String(question || "").trim();
+  if (!blob) return true;
+  const letters = blob.match(/[A-Za-zçğıöşüÇĞİÖŞÜ]/g);
+  return !letters || letters.length < 3;
+}
+
+function stripFactHead(text) {
+  const blob = String(text || "").trim();
+  if (/^ASİSTAN\s*:/u.test(blob)) {
+    return blob.replace(/^ASİSTAN\s*:\s*/u, "Asistan. ").trim();
+  }
+  return blob
+    .replace(
+      /^(ÖZET|ÜRÜN|KUTU|KAPLAMA|ALARM|ML|YAZILIM|VERİCİ|ALICI|Neden|Açık|Akış|Donanım|Kim|Saha)\s*:\s*/u,
+      "",
+    )
+    .replace(/^MESH\b[^:]*:\s*/u, "")
+    .trim();
+}
+
+function factParas(facts = AOG_FACTS) {
+  const skipHead = ["Sen AOG", "CEVAP:", "YAZIM:"];
+  return String(facts || "")
+    .split(/\n\n+/)
+    .map((block) => block.trim())
+    .filter((block) => block && !skipHead.some((head) => block.startsWith(head)));
+}
+
+function takeSentences(text, n = 4) {
+  return stripFactHead(text)
+    .split(/(?<=[.!?])\s+/)
+    .slice(0, n)
+    .join(" ")
+    .trim();
+}
+
+const ASK_AGAIN = "Ne sormak istiyorsun? Kutu, alarm kuralı veya kaplama yaz.";
+
+function overviewReply(facts = AOG_FACTS) {
+  const paras = factParas(facts);
+  const hibrit = paras.find((row) => stripFactHead(row).startsWith("AOG hibrit"));
+  if (hibrit) return takeSentences(hibrit, 4);
+  const urun = paras.find((row) => row.startsWith("ÜRÜN:"));
+  if (urun) return takeSentences(urun, 4);
+  return REPLY_SYSTEMS[0];
 }
 const LEAK_RE =
   /alright|let['’]s tackle|\bthe user\b|first, i need|\bi (need to|should|must) (understand|explain|consider|decide|generate)\b|provide a pdf|generate the pdf|let me think|as an ai|my response was|chain of thought|wait, the user|\bsen aog\b|system architecture|i didn't include|\*\*\s*model\s*:\s*\*\*|\/v1\/chat\/completions|kullanıcı,\s+sistem hakkında|spek listesi|dosya yolu|cevap hazırladım|kipin teknik ad|kullanıcının isteği|detaylı bilgiler|işte sistem hakkında/i;
@@ -199,22 +243,20 @@ export function looksLikeScratch(text, question = "") {
 }
 
 export function fallbackReply(question) {
+  if (thinQuestion(question)) return ASK_AGAIN;
   const q = String(question || "").toLocaleLowerCase("tr");
-  if (/kullanıcı|kaç kullan|kac kullan/.test(q)) return pickOne(REPLY_USER_N);
-  if (INGREDIENT_Q_RE.test(q)) return pickOne(REPLY_INGREDIENTS);
-  if (SHORT_Q_RE.test(q)) return pickOne(REPLY_SHORT);
-  if (/alarm|ntfy|eşik|esik/.test(q)) return pickOne(REPLY_ALARMS);
-  if (/kaplama|karışım|karisim/.test(q)) return pickOne(REPLY_COATS);
-  return pickOne(REPLY_SYSTEMS);
+  if (/kullanıcı|kaç kullan|kac kullan/.test(q)) return REPLY_USER_N[0];
+  if (INGREDIENT_Q_RE.test(q)) return REPLY_INGREDIENTS[0];
+  if (SHORT_Q_RE.test(q)) return REPLY_SHORT[0];
+  if (/alarm|ntfy|eşik|esik/.test(q)) return REPLY_ALARMS[0];
+  if (/kaplama|karışım|karisim/.test(q)) return REPLY_COATS[0];
+  return overviewReply();
 }
 
 export function mdReply(question, facts = AOG_FACTS) {
+  if (thinQuestion(question)) return ASK_AGAIN;
   const q = String(question || "").toLocaleLowerCase("tr");
-  const skipHead = ["Sen AOG", "CEVAP:", "YAZIM:"];
-  const paras = String(facts || "")
-    .split(/\n\n+/)
-    .map((block) => block.trim())
-    .filter((block) => block && !skipHead.some((head) => block.startsWith(head)));
+  const paras = factParas(facts);
   const headMap = [
     ["ALARM:", /alarm|ntfy|eşik|esik/i],
     ["KAPLAMA:", /kaplama|karışım|karisim|aloe|ksantan/i],
@@ -222,13 +264,17 @@ export function mdReply(question, facts = AOG_FACTS) {
     ["ML:", /sklearn|öğrenme|ogrenme|makine/i],
     ["ASİSTAN:", /\basistan\b|\bkip\b/i],
     ["MESH", /\bmesh\b/i],
-    ["ÖZET:", /\bnedir\b|\bsistem\b|\baog\b|\bproje\b/i],
+    ["ÖZET:", /nedir|sistem|aog|proje|hakkında bilgi/i],
   ];
   for (const [head, re] of headMap) {
     if (!re.test(q)) continue;
+    if (head === "ÖZET:") {
+      const overview = overviewReply(facts);
+      if (overview) return overview;
+    }
     const block = paras.find((row) => row.toUpperCase().startsWith(head));
     if (block) {
-      const text = block.split(/(?<=[.!?])\s+/).slice(0, 4).join(" ").trim();
+      const text = takeSentences(block, 4);
       if (text) return text;
     }
   }
@@ -236,6 +282,7 @@ export function mdReply(question, facts = AOG_FACTS) {
   let best = "";
   let bestN = 0;
   for (const block of paras) {
+    if (block.startsWith("ÖZET:")) continue;
     const hay = block.toLocaleLowerCase("tr");
     const n = keys.reduce((acc, word) => acc + (hay.includes(word) ? 1 : 0), 0);
     if (n > bestN) {
@@ -244,7 +291,7 @@ export function mdReply(question, facts = AOG_FACTS) {
     }
   }
   if (best && bestN) {
-    const text = best.split(/(?<=[.!?])\s+/).slice(0, 4).join(" ").trim();
+    const text = takeSentences(best, 4);
     if (text) return text;
   }
   return fallbackReply(question);

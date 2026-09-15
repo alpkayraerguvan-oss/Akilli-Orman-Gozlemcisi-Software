@@ -280,10 +280,12 @@ class ChatGuardTests(unittest.TestCase):
         self.assertNotEqual(first["seed"], second["seed"])
         self.assertLessEqual(first["max_tokens"], 256)
 
-    def test_fallback_for_varies(self):
-        texts = {P.fallback_for("sistem hakkında bilgi ver") for _ in range(40)}
-        self.assertGreaterEqual(len(texts), 2)
-        self.assertTrue(all("LoRa" in row or "433" in row or "kutu" in row for row in texts))
+    def test_fallback_for_project_is_stable_overview(self):
+        first = P.fallback_for("sistem hakkında bilgi ver")
+        second = P.fallback_for("sistem hakkında bilgi ver")
+        self.assertEqual(first, second)
+        self.assertRegex(first, r"hibrit|LoRa")
+        self.assertNotRegex(first, r"^ÖZET:|Slogan:")
 
     def test_burst_then_ban(self):
         now = 1_000_000.0
@@ -324,6 +326,23 @@ class ChatGuardTests(unittest.TestCase):
         text = P.md_reply("Kutuda Wi-Fi var mı?")
         self.assertTrue(text)
         self.assertRegex(text, r"Wi-Fi|LoRa|433|kutu")
+        self.assertNotRegex(text, r"^KUTU:")
+
+    def test_md_reply_project_skips_slogan_dump(self):
+        text = P.md_reply("proje hakkında bilgi ver")
+        self.assertRegex(text, r"hibrit|LoRa")
+        self.assertNotRegex(text, r"^ÖZET:|Slogan:")
+        self.assertRegex(P.md_reply("sistemi anlat"), r"hibrit|LoRa")
+        self.assertRegex(P.md_reply("SİSTEM NEDİR?"), r"hibrit|LoRa")
+        self.assertNotRegex(P.md_reply("TEKNOFEST nedir"), r"Slogan:")
+        kept = P.finalize_reply(P.md_reply("Asistan kipi nedir?"), "", "Asistan kipi nedir?")
+        self.assertRegex(kept, r"Hızlı cevaplar|üç kip")
+
+    def test_md_reply_dot_asks_again(self):
+        first = P.md_reply(".")
+        self.assertEqual(first, P.md_reply("."))
+        self.assertRegex(first, r"Ne sormak")
+        self.assertNotRegex(first, r"433 MHz|Mesh sistemi")
 
     def test_facts_payload_keeps_asistan_block(self):
         text = P.md_reply("Asistan kipi nedir?")

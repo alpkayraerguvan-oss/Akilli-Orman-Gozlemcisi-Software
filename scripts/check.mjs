@@ -391,6 +391,14 @@ test("chat kips hide model names and map tokens", async () => {
   assert.equal(facts, AOG_FACTS.trim());
   assert.match(mdReply("Kutuda Wi-Fi var mı?"), /Wi-Fi|internet|LoRa/);
   assert.doesNotMatch(mdReply("Kutuda Wi-Fi var mı?"), /yanıt veremiyor|Ollama|\.gguf/i);
+  assert.match(mdReply("proje hakkında bilgi ver"), /hibrit|LoRa/);
+  assert.doesNotMatch(mdReply("proje hakkında bilgi ver"), /^ÖZET:|Slogan:/);
+  assert.match(mdReply("sistemi anlat"), /hibrit|LoRa/);
+  assert.match(cleanReply(mdReply("Asistan kipi nedir?"), "Asistan kipi nedir?"), /Hızlı cevaplar|üç kip/);
+  assert.doesNotMatch(mdReply("TEKNOFEST nedir"), /Slogan:/);
+  assert.equal(mdReply("."), mdReply("."));
+  assert.match(mdReply("."), /Ne sormak/);
+  assert.doesNotMatch(mdReply("."), /433 MHz|Mesh sistemi|ÖZET:/);
   assert.match(mdReply("Asistan kipi nedir?"), /Hızlı cevaplar|üç kip/);
   assert.doesNotMatch(mdReply("OGM ekipleri kim?"), /üç kip|Hızlı cevaplar/);
   assert.match(facts, /ÖZET:/);
