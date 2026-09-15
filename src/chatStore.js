@@ -187,13 +187,52 @@ function takeSentences(text, n = 4) {
 
 const ASK_AGAIN = "Ne sormak istiyorsun? Kutu, alarm kuralı veya kaplama yaz.";
 
-function overviewReply(facts = AOG_FACTS) {
-  const paras = factParas(facts);
-  const hibrit = paras.find((row) => stripFactHead(row).startsWith("AOG hibrit"));
-  if (hibrit) return takeSentences(hibrit, 4);
-  const urun = paras.find((row) => row.startsWith("ÜRÜN:"));
-  if (urun) return takeSentences(urun, 4);
-  return REPLY_SYSTEMS[0];
+let overviewTick = 0;
+
+function sentencesOf(facts, pred) {
+  const block = factParas(facts).find(pred);
+  if (!block) return [];
+  return stripFactHead(block)
+    .split(/(?<=[.!?])\s+/)
+    .filter(Boolean);
+}
+
+function joinSentences(parts, n = 4) {
+  return parts.filter(Boolean).slice(0, n).join(" ").trim();
+}
+
+function overviewVariants(facts = AOG_FACTS) {
+  const hibrit = sentencesOf(facts, (row) => stripFactHead(row).startsWith("AOG hibrit"));
+  const akis = sentencesOf(facts, (row) => row.startsWith("Akış:"));
+  const urun = sentencesOf(facts, (row) => row.startsWith("ÜRÜN:"));
+  const donanim = sentencesOf(facts, (row) => row.startsWith("Donanım:"));
+  const saha = sentencesOf(facts, (row) => row.startsWith("Saha:"));
+  const kaplama = sentencesOf(facts, (row) => row.startsWith("Kaplama aloe"));
+  return [
+    joinSentences(hibrit, 4),
+    joinSentences(akis, 4),
+    joinSentences(urun, 4),
+    joinSentences(donanim, 3),
+    joinSentences(saha, 4),
+    joinSentences([...hibrit.slice(0, 2), ...kaplama.slice(0, 2)], 4),
+    joinSentences([...hibrit.slice(0, 1), ...akis.slice(0, 3)], 4),
+    joinSentences([...urun.slice(0, 2), ...saha.slice(0, 2)], 4),
+  ].filter((row) => row.length > 50 && row.includes("LoRa"));
+}
+
+function hashQuestion(question) {
+  const s = String(question || "");
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 33 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function overviewReply(facts = AOG_FACTS, question = "") {
+  const variants = overviewVariants(facts);
+  if (!variants.length) return REPLY_SYSTEMS[0];
+  const idx = (hashQuestion(question) + overviewTick) % variants.length;
+  overviewTick += 1;
+  return variants[idx];
 }
 const LEAK_RE =
   /alright|let['’]s tackle|\bthe user\b|first, i need|\bi (need to|should|must) (understand|explain|consider|decide|generate)\b|provide a pdf|generate the pdf|let me think|as an ai|my response was|chain of thought|wait, the user|\bsen aog\b|system architecture|i didn't include|\*\*\s*model\s*:\s*\*\*|\/v1\/chat\/completions|kullanıcı,\s+sistem hakkında|spek listesi|dosya yolu|cevap hazırladım|kipin teknik ad|kullanıcının isteği|detaylı bilgiler|işte sistem hakkında/i;
@@ -250,7 +289,7 @@ export function fallbackReply(question) {
   if (SHORT_Q_RE.test(q)) return REPLY_SHORT[0];
   if (/alarm|ntfy|eşik|esik/.test(q)) return REPLY_ALARMS[0];
   if (/kaplama|karışım|karisim/.test(q)) return REPLY_COATS[0];
-  return overviewReply();
+  return overviewReply(AOG_FACTS, question);
 }
 
 export function mdReply(question, facts = AOG_FACTS) {
@@ -269,7 +308,7 @@ export function mdReply(question, facts = AOG_FACTS) {
   for (const [head, re] of headMap) {
     if (!re.test(q)) continue;
     if (head === "ÖZET:") {
-      const overview = overviewReply(facts);
+      const overview = overviewReply(facts, question);
       if (overview) return overview;
     }
     const block = paras.find((row) => row.toUpperCase().startsWith(head));

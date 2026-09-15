@@ -606,15 +606,55 @@ def take_sentences(text, n=4):
     return " ".join(bits[:n]).strip()
 
 
-def overview_reply(facts=None):
-    paras = fact_paras(facts if facts is not None else read_facts())
-    for block in paras:
-        if strip_fact_head(block).startswith("AOG hibrit"):
-            return take_sentences(block, 4)
-    for block in paras:
-        if block.startswith("ÜRÜN:"):
-            return take_sentences(block, 4)
-    return REPLY_SYSTEMS[0]
+_overview_tick = 0
+
+
+def sentences_of(facts, pred):
+    for block in fact_paras(facts):
+        if pred(block):
+            return [bit for bit in re.split(r"(?<=[.!?])\s+", strip_fact_head(block)) if bit]
+    return []
+
+
+def overview_variants(facts):
+    hibrit = sentences_of(facts, lambda row: strip_fact_head(row).startswith("AOG hibrit"))
+    akis = sentences_of(facts, lambda row: row.startswith("Akış:"))
+    urun = sentences_of(facts, lambda row: row.startswith("ÜRÜN:"))
+    donanim = sentences_of(facts, lambda row: row.startswith("Donanım:"))
+    saha = sentences_of(facts, lambda row: row.startswith("Saha:"))
+    kaplama = sentences_of(facts, lambda row: row.startswith("Kaplama aloe"))
+
+    def take(parts, n=4):
+        return " ".join([bit for bit in parts if bit][:n]).strip()
+
+    return [
+        row
+        for row in (
+            take(hibrit, 4),
+            take(akis, 4),
+            take(urun, 4),
+            take(donanim, 3),
+            take(saha, 4),
+            take(hibrit[:2] + kaplama[:2], 4),
+            take(hibrit[:1] + akis[:3], 4),
+            take(urun[:2] + saha[:2], 4),
+        )
+        if len(row) > 50 and "LoRa" in row
+    ]
+
+
+def overview_reply(facts=None, question=""):
+    global _overview_tick
+    blob = facts if facts is not None else read_facts()
+    variants = overview_variants(blob)
+    if not variants:
+        return REPLY_SYSTEMS[0]
+    h = 0
+    for ch in str(question or ""):
+        h = (h * 33 + ord(ch)) & 0xFFFFFFFF
+    idx = (h + _overview_tick) % len(variants)
+    _overview_tick += 1
+    return variants[idx]
 
 
 def fallback_for(question):
@@ -631,7 +671,7 @@ def fallback_for(question):
         return REPLY_ALARMS[0]
     if "kaplama" in q or "karışım" in q or "karisim" in q:
         return REPLY_COATS[0]
-    return overview_reply()
+    return overview_reply(question=question)
 
 
 def md_reply(question):
@@ -642,7 +682,7 @@ def md_reply(question):
     if not facts:
         return fallback_for(question)
     if looks_like_overview_question(question):
-        text = overview_reply(facts)
+        text = overview_reply(facts, question)
         if text:
             return text
     paras = fact_paras(facts)
@@ -659,7 +699,7 @@ def md_reply(question):
         if not pat.search(q):
             continue
         if head == "ÖZET:":
-            text = overview_reply(facts)
+            text = overview_reply(facts, question)
             if text:
                 return text
         for block in paras:
