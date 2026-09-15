@@ -1,38 +1,33 @@
-# Kayıt — 10 Eylül 2026 öğle
+# Kayıt — 15 Eylül 2026 akşam
 
-Yazılım `main` `b6489e2`. PWA yayında. GitHub Clerk girişi çalışıyor. Bu dosyada şifre, `sk_live_`, OAuth secret yok.
+Yazılım `main` `028e174`. PWA yayında. Bu dosyada şifre, `sk_live_`, OAuth secret yok.
 
 ## Durum
 
 - PWA: `https://akilli-orman-gozlemcisi-software.vercel.app`
-- Clerk production: GitHub SSO açık. Google ve Microsoft kapalı.
-- SW: `aog-shell-v11` (`/__clerk`, `/api/`, `/v1/` worker’a girmez)
-- FAPI: `/__clerk` → Edge proxy → `frontend-api.clerk.dev`. POST body ArrayBuffer. Yanıttan `content-encoding` ve Clerk CSP düşer.
-- Asistan `/v1` hâlâ kimlik doğrulamasız Vercel rewrite. HIGH. Jüri öncesi kapat veya JWT.
-- Final denetim (tasarım + güvenlik) Cursor canvas: sohbetin yanındaki `final-audit`. GitHub’a canvas konmaz.
+- GitHub: `kdorukdemirtas-star/Akilli-Orman-Gozlemcisi-Software` `main`
+- SW: `aog-shell-v14`
+- Clerk: GitHub SSO. Google ve Microsoft kapalı.
+- Asistan `/v1` → `vercel.json` quick tunnel (`trycloudflare.com/v1/:path*`). Tunnel düşerse hostname değişir; `vercel.json` hedefini güncelle, commit, push.
+- Clerk altındaki **Demo**: hesapsız giriş. Demo sohbeti ortak (`/v1/demo-threads`). Hesaplı sohbet ayrı kalır.
+- Kip: Hızlı / Orta / Derin. İstemci 120 s bekler; AOG.md basılmaz. Kip yanıtı `pi/chat_proxy.py` üzerinden gider.
+- Donanım klasörü (`Akıllı Orman Gözlemcisi`) git deposu değil.
 
-## Pi (LAN `192.168.68.61`, kullanıcı `demir`)
+## Yarın açınca
 
-`pkill -f chat_proxy.py` kullanma.
+1. Bu Mac’te kip dinleyicisi (`127.0.0.1:8080`) ve quick tunnel ayakta olsun. `pkill -f chat_proxy.py` kullanma; PID ile durdur.
+2. `curl -sS http://127.0.0.1:8080/health` → `kips`.
+3. Tunnel URL `vercel.json` ile aynı mı bak. Değiştiyse rewrite’ı yaz, push et.
+4. Canlı sitede sert yenile. Asistan’da Clerk veya Demo.
 
 ```bash
-cd /home/demir/aog-pi/supabase && docker compose start
-cd /home/demir/aog-pi/cloudflared && docker compose start
-docker compose -f /home/demir/aog-pi/cloudflared/docker-compose.try.yml up -d --force-recreate
-sudo systemctl start aog-chat.service aog-i2c.service aog-ml.timer
+cd /Users/dorukdemirtas/Desktop/Akilli-Orman-Gozlemcisi-Software
+AOG_INFER=ollama LISTEN=127.0.0.1 PORT=8080 python3 pi/chat_proxy.py
+# ayrı terminal:
+cloudflared tunnel --url http://127.0.0.1:8080
 ```
 
-Quick tunnel hostname dönerse `vercel.json` `/v1` hedefini güncelle, commit, push.
-
-## Clerk
-
-- App: `app_3J6jotrFwy4EMawIaQhDyq9T3Xh`
-- Production: `ins_3J6p8v8hOCnuo6LHPERH3m0Zjyi`
-- Callback: `https://akilli-orman-gozlemcisi-software.vercel.app/__clerk/v1/oauth_callback`
-- Vercel env adları (değer yok): `VITE_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `VITE_CLERK_PROXY_URL=/__clerk`, `VITE_CLERK_JS_URL`
-- GitHub client secret sohbette göründüyse GitHub’da döndür, Clerk’e patch et. Değeri buraya yazma.
-
-Doğrulama: `/asistan` → Clerk kartı → Continue with GitHub → `github.com/login/oauth/authorize`.
+Pi (LAN) notu duruyor: `pkill -f chat_proxy.py` kullanma. Jüri metninde Mac / kip host adı yok.
 
 ## Kilit ürün kuralları
 
@@ -40,15 +35,18 @@ Doğrulama: `/asistan` → Clerk kartı → Continue with GitHub → `github.com
 - `fixedAlert` ve firmware AND kuralını değiştirme
 - Asistan gerçekleri `pi/AOG.md` + `AOG_FACTS` birebir. Chat `fetch("/v1/chat/completions")`
 - Kip: Hızlı / Orta / Derin cevaplar. Hop: Mesh sistemi
-- Testler: sklearn, StandardScaler, LoRa, 0x2A, Mesh sistemi, Clerk. Lab pik 399 °C
+- Slayt: eşik yok, SWOT yok, dünyada ilk yok, kamera yok, GGUF adı yok
+- Testler: `node --test scripts/check.mjs` ve `python3 scripts/test_chat_proxy.py`
 
-## Güvenlik özeti
+## Clerk
 
-npm audit production: 0. HIGH: `/v1` açık; JWT yok; vekil kimlik yok; Clerk ACAO Origin yansıtır; GitHub secret döndür; Pi compose sırları.
+- App: `app_3J6jotrFwy4EMawIaQhDyq9T3Xh`
+- Production: `ins_3J6p8v8hOCnuo6LHPERH3m0Zjyi`
+- Callback: `https://akilli-orman-gozlemcisi-software.vercel.app/__clerk/v1/oauth_callback`
+- Vercel env adları (değer yok): `VITE_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `VITE_CLERK_PROXY_URL=/__clerk`, `VITE_CLERK_JS_URL`
 
 ## Git / deploy
 
-- `kdorukdemirtas-star/Akilli-Orman-Gozlemcisi-Software` `main`
 - Vercel: `akilli-orman-gozlemcisi-software`
 - `.env.local` commit etme
-- Donanım klasörü (`Akıllı Orman Gözlemcisi`) git deposu değil
+- `pi/demo_threads.json` gitignore; Demo sohbeti kip hostunda durur
