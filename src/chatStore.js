@@ -208,6 +208,48 @@ export function fallbackReply(question) {
   return pickOne(REPLY_SYSTEMS);
 }
 
+export function mdReply(question, facts = AOG_FACTS) {
+  const q = String(question || "").toLocaleLowerCase("tr");
+  const skipHead = ["Sen AOG", "CEVAP:", "YAZIM:"];
+  const paras = String(facts || "")
+    .split(/\n\n+/)
+    .map((block) => block.trim())
+    .filter((block) => block && !skipHead.some((head) => block.startsWith(head)));
+  const headMap = [
+    ["ALARM:", /alarm|ntfy|eşik|esik/i],
+    ["KAPLAMA:", /kaplama|karışım|karisim|aloe|ksantan/i],
+    ["KUTU:", /wifi|wi-fi|gsm|internet|kutu/i],
+    ["ML:", /sklearn|öğrenme|ogrenme|makine/i],
+    ["ASİSTAN:", /\basistan\b|\bkip\b/i],
+    ["MESH", /\bmesh\b/i],
+    ["ÖZET:", /\bnedir\b|\bsistem\b|\baog\b|\bproje\b/i],
+  ];
+  for (const [head, re] of headMap) {
+    if (!re.test(q)) continue;
+    const block = paras.find((row) => row.toUpperCase().startsWith(head));
+    if (block) {
+      const text = block.split(/(?<=[.!?])\s+/).slice(0, 4).join(" ").trim();
+      if (text) return text;
+    }
+  }
+  const keys = (q.match(/[a-zçğıöşü0-9]+/gi) || []).filter((word) => word.length > 3);
+  let best = "";
+  let bestN = 0;
+  for (const block of paras) {
+    const hay = block.toLocaleLowerCase("tr");
+    const n = keys.reduce((acc, word) => acc + (hay.includes(word) ? 1 : 0), 0);
+    if (n > bestN) {
+      bestN = n;
+      best = block;
+    }
+  }
+  if (best && bestN) {
+    const text = best.split(/(?<=[.!?])\s+/).slice(0, 4).join(" ").trim();
+    if (text) return text;
+  }
+  return fallbackReply(question);
+}
+
 export function cleanReply(text, question) {
   const cleaned = stripThink(text);
   if (looksLikeScratch(cleaned, question)) return fallbackReply(question);

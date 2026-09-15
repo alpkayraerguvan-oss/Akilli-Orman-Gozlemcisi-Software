@@ -16,10 +16,18 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+def _aog_md_path():
+    here = Path(__file__).resolve().parent / "AOG.md"
+    for candidate in (os.environ.get("AOG_MD", "").strip(), str(here), "/home/demir/aog-pi/AOG.md"):
+        if candidate and Path(candidate).is_file():
+            return candidate
+    return str(here)
+
+
 LISTEN = os.environ.get("LISTEN", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "8080"))
 LLAMA_BIN = os.environ.get("LLAMA_BIN", "/home/demir/aog-pi/llama.cpp/build/bin/llama-server")
-AOG_MD = os.environ.get("AOG_MD", "/home/demir/aog-pi/AOG.md")
+AOG_MD = _aog_md_path()
 HIZLI_GGUF = os.environ.get(
     "HIZLI_GGUF",
     "/home/demir/aog-pi/models/Qwen_Qwen3.5-0.8B-Q4_K_M.gguf",
@@ -285,7 +293,12 @@ LIMITS = LimitBook()
 
 
 def infer_ollama():
-    return INFER in ("ollama", "1", "true", "yes")
+    flag = os.environ.get("AOG_INFER", INFER).strip().lower()
+    if flag in ("llama", "gguf", "pi"):
+        return False
+    if flag in ("ollama", "1", "true", "yes"):
+        return True
+    return not os.path.isfile(HIZLI_GGUF)
 
 
 def kip_ready(kip):
@@ -562,6 +575,58 @@ def fallback_for(question):
     if "kaplama" in q or "karışım" in q or "karisim" in q:
         return secrets.choice(REPLY_COATS)
     return secrets.choice(REPLY_SYSTEMS)
+
+
+def md_reply(question):
+    facts = read_facts()
+    q = str(question or "").casefold()
+    if not facts:
+        return fallback_for(question)
+    skip_head = ("Sen AOG", "CEVAP:", "YAZIM:")
+    paras = []
+    for block in facts.split("\n\n"):
+        block = block.strip()
+        if not block or block.startswith(skip_head):
+            continue
+        paras.append(block)
+    head_map = (
+        ("ALARM:", re.compile(r"alarm|ntfy|eşik|esik")),
+        ("KAPLAMA:", re.compile(r"kaplama|karışım|karisim|aloe|ksantan")),
+        ("KUTU:", re.compile(r"wifi|wi-fi|gsm|internet|kutu")),
+        ("ML:", re.compile(r"sklearn|öğrenme|ogrenme|makine")),
+        ("ASİSTAN:", re.compile(r"\basistan\b|\bkip\b")),
+        ("MESH", re.compile(r"\bmesh\b")),
+        ("ÖZET:", re.compile(r"\bnedir\b|\bsistem\b|\baog\b|\bproje\b")),
+    )
+    for head, pat in head_map:
+        if pat.search(q):
+            for block in paras:
+                if block.upper().startswith(head):
+                    bits = re.split(r"(?<=[.!?])\s+", block)
+                    text = " ".join(bits[:4]).strip()
+                    if text:
+                        return text
+    keys = [w for w in re.findall(r"[a-zçğıöşü0-9]+", q, flags=re.I) if len(w) > 3]
+    best = ""
+    best_n = 0
+    for block in paras:
+        n = sum(1 for w in keys if w in block.casefold())
+        if n > best_n:
+            best_n = n
+            best = block
+    if best and best_n:
+        bits = re.split(r"(?<=[.!?])\s+", best)
+        text = " ".join(bits[:4]).strip()
+        if text:
+            return text
+    return fallback_for(question)
+
+
+def facts_payload(kip, question):
+    return {
+        "model": kip,
+        "choices": [{"message": {"role": "assistant", "content": scrub(md_reply(question))}}],
+    }
 
 
 def last_user_question(payload):
@@ -885,8 +950,9 @@ class Handler(BaseHTTPRequestHandler):
             }
             self._send(200, hide_model(scoped, kip, prepared["question"]))
             return
+        qn = prepared["question"]
         if not kip_ready(kip):
-            self._send(503, {"error": {"message": KIPS[kip]["missing"]}})
+            self._send(200, facts_payload(kip, qn))
             return
         if not take_slot():
             self._send(
@@ -897,46 +963,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             if not ensure(kip):
-                self._send(503, {"error": {"message": KIPS[kip]["missing"]}})
+                self._send(200, facts_payload(kip, qn))
                 return
-            data = hide_model(forward(kip, outbound), kip, prepared["question"])
-        except TimeoutError:
-            self._send(
-                504,
-                {
-                    "error": {
-                        "message": "Yanıt zaman aşımına uğradı. Hızlı cevapları dene veya biraz sonra yeniden gönder."
-                    }
-                },
-            )
-            return
-        except LlamaBusy:
-            self._send(
-                503,
-                {"error": {"message": "Asistan şu an yanıt veremiyor. Biraz sonra yeniden dene."}},
-            )
-            return
-        except urllib.error.URLError as err:
-            reason = str(getattr(err, "reason", err) or err).lower()
-            timed_out = "timed out" in reason or isinstance(getattr(err, "reason", None), TimeoutError)
-            self._send(
-                504 if timed_out else 503,
-                {
-                    "error": {
-                        "message": (
-                            "Yanıt zaman aşımına uğradı. Hızlı cevapları dene veya biraz sonra yeniden gönder."
-                            if timed_out
-                            else "Asistan şu an yanıt veremiyor. Biraz sonra yeniden dene."
-                        )
-                    }
-                },
-            )
-            return
-        except Exception:
-            self._send(
-                503,
-                {"error": {"message": "Asistan şu an yanıt veremiyor. Biraz sonra yeniden dene."}},
-            )
+            data = hide_model(forward(kip, outbound), kip, qn)
+        except (TimeoutError, LlamaBusy, urllib.error.URLError, Exception):
+            self._send(200, facts_payload(kip, qn))
             return
         finally:
             release_slot()

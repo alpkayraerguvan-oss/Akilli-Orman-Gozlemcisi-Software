@@ -9,7 +9,7 @@ import { addPlugin, alarmModeFor, asHttpUrl, defaultPlugins, pluginAdded, PLUGIN
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { asChatKip, AOG_FACTS, CHAT_KIPS, chatModel, cleanReply, kipLabel, kipTemp, kipTokens, looksLikeScratch, readThreads, stripThink, systemPrompt, titleFromQuestion, accountStoreKey, writeThreads } from "../src/chatStore.js";
+import { asChatKip, AOG_FACTS, CHAT_KIPS, chatModel, cleanReply, kipLabel, kipTemp, kipTokens, looksLikeScratch, mdReply, readThreads, stripThink, systemPrompt, titleFromQuestion, accountStoreKey, writeThreads } from "../src/chatStore.js";
 import { blendWeights, decideAlert, dynamicAlert, fixedAlert, monthsSince, tempP90 } from "../src/alertBlend.js";
 import { stationFromUser } from "../src/stationBind.js";
 import { deviceKind, isStandaloneDisplay, pwaPlatform } from "../src/pwa.js";
@@ -388,6 +388,10 @@ test("chat kips hide model names and map tokens", () => {
     "utf8",
   ).trim();
   assert.equal(facts, AOG_FACTS.trim());
+  assert.match(mdReply("Kutuda Wi-Fi var mı?"), /Wi-Fi|internet|LoRa/);
+  assert.doesNotMatch(mdReply("Kutuda Wi-Fi var mı?"), /yanıt veremiyor|Ollama|\.gguf/i);
+  assert.match(mdReply("Asistan kipi nedir?"), /Hızlı cevaplar|üç kip/);
+  assert.doesNotMatch(mdReply("OGM ekipleri kim?"), /üç kip|Hızlı cevaplar/);
   assert.match(facts, /ÖZET:/);
   assert.match(facts, /CEVAP:/);
   assert.match(facts, /YAZIM:/);
@@ -501,6 +505,7 @@ test("chat kips hide model names and map tokens", () => {
   assert.doesNotMatch(lookout, /title="sklearn"/);
   const asistan = readFileSync(join(here, "../src/Asistan.jsx"), "utf8");
   assert.match(asistan, /fetch\("\/v1\/chat\/completions"/);
+  assert.match(asistan, /mdReply/);
   assert.doesNotMatch(asistan, /systemPrompt/);
   assert.match(asistan, /useUser/);
   assert.match(asistan, /writeThreads\([\s\S]*userId/);

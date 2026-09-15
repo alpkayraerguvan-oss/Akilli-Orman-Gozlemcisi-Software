@@ -9,6 +9,7 @@ import {
   chatModel,
   kipTemp,
   kipTokens,
+  mdReply,
   newThreadId,
   readKip,
   readThreads,
@@ -54,9 +55,29 @@ async function askPi(question, kip, signal) {
     fail.status = res.status;
     throw fail;
   }
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch (err) {
+    if (isAbort(err)) throw err;
+    const fail = new Error("Failed to fetch");
+    fail.status = 502;
+    throw fail;
+  }
   const msg = data?.choices?.[0]?.message || {};
   return cleanReply(msg.content, question);
+}
+
+async function askChat(question, kip, signal) {
+  try {
+    const raw = await askPi(question, kip, signal);
+    const text = String(raw || "").trim();
+    if (text) return text;
+    return mdReply(question);
+  } catch (err) {
+    if (isAbort(err)) throw err;
+    return mdReply(question);
+  }
 }
 
 function isAbort(err) {
@@ -188,7 +209,7 @@ export default function Asistan({ product = "software" }) {
       return;
     }
     try {
-      const raw = await askPi(text, kip, ac.signal);
+      const raw = await askChat(text, kip, ac.signal);
       const reply =
         String(raw || "").trim() ||
         "Asistan boş yanıt döndürdü. Hızlı cevapları dene.";

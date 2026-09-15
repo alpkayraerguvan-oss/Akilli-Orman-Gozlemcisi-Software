@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import importlib.util
 import os
+import re
 import unittest
 from pathlib import Path
 
@@ -305,9 +306,32 @@ class ChatGuardTests(unittest.TestCase):
         local = FakeHandler("127.0.0.1", {"CF-Connecting-IP": "9.9.9.9"})
         self.assertEqual(P.peer_ip(local), "9.9.9.9")
 
-    def test_kip_ready_without_infer_uses_gguf_path(self):
-        self.assertFalse(P.infer_ollama())
-        self.assertFalse(P.kip_ready("hizli"))
+    def test_infer_ollama_when_gguf_missing(self):
+        old = os.environ.get("AOG_INFER")
+        os.environ.pop("AOG_INFER", None)
+        try:
+            self.assertFalse(os.path.isfile(P.HIZLI_GGUF))
+            self.assertTrue(P.infer_ollama())
+            os.environ["AOG_INFER"] = "llama"
+            self.assertFalse(P.infer_ollama())
+        finally:
+            if old is None:
+                os.environ.pop("AOG_INFER", None)
+            else:
+                os.environ["AOG_INFER"] = old
+
+    def test_md_reply_uses_aog_facts(self):
+        text = P.md_reply("Kutuda Wi-Fi var mı?")
+        self.assertTrue(text)
+        self.assertRegex(text, r"Wi-Fi|LoRa|433|kutu")
+
+    def test_facts_payload_keeps_asistan_block(self):
+        text = P.md_reply("Asistan kipi nedir?")
+        self.assertRegex(text, r"Hızlı cevaplar|üç kip")
+        data = P.facts_payload("hizli", "Asistan kipi nedir?")
+        body = data["choices"][0]["message"]["content"]
+        self.assertRegex(body, r"Hızlı cevaplar|üç kip")
+        self.assertNotRegex(body, re.compile(r"qwen|gguf|Ollama", re.I))
 
 
 if __name__ == "__main__":
