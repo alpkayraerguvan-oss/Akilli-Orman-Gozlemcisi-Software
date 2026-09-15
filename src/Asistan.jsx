@@ -69,14 +69,29 @@ async function askPi(question, kip, signal) {
 }
 
 async function askChat(question, kip, signal) {
+  const local = cleanReply(mdReply(question), question);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 2500);
+  const onParent = () => ctrl.abort();
+  signal?.addEventListener("abort", onParent);
+  const canceled = () => {
+    const err = new Error("Aborted");
+    err.name = "AbortError";
+    return err;
+  };
   try {
-    const raw = await askPi(question, kip, signal);
+    if (signal?.aborted) throw canceled();
+    const raw = await askPi(question, kip, ctrl.signal);
+    if (signal?.aborted) throw canceled();
     const text = String(raw || "").trim();
     if (text) return text;
-    return mdReply(question);
+    return local;
   } catch (err) {
-    if (isAbort(err)) throw err;
-    return mdReply(question);
+    if (signal?.aborted) throw canceled();
+    return local;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", onParent);
   }
 }
 
@@ -220,10 +235,12 @@ export default function Asistan({ product = "software" }) {
       );
     } catch (e) {
       if (isAbort(e)) return;
-      setErr({
-        id,
-        text: chatLoadHint(e.status, e instanceof Error ? e.message : ""),
-      });
+      const reply = cleanReply(mdReply(text), text);
+      saveThreads(
+        readThreads(userId).map((row) =>
+          row.id === id ? { ...row, lines: [...row.lines, { who: "pi", text: reply }] } : row,
+        ),
+      );
     } finally {
       if (inflight.current.get(id) === ac) inflight.current.delete(id);
       setBusyId((cur) => (cur === id ? "" : cur));

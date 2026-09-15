@@ -10,8 +10,15 @@ const HARD_INJECT_RE =
 export const INJECTION_HINT =
   "Bu istek asistanın kuralını değiştirmeye çalışıyor. Ürün, alarm veya kaplama sor.";
 
+export function sanitizeUser(text, cap = 500) {
+  return String(text || "")
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "")
+    .trim()
+    .slice(0, cap);
+}
+
 export function looksLikeInjection(text) {
-  const blob = String(text || "").trim();
+  const blob = sanitizeUser(text, 1000);
   if (!blob) return false;
   const hard = HARD_INJECT_RE.test(blob);
   if (PRODUCT_RE.test(blob) && !hard) return false;

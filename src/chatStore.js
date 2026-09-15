@@ -86,7 +86,7 @@ ML: sklearn Pipeline (StandardScaler + LogisticRegression, class_weight balanced
 
 KAPLAMA: Yangını söndürmez; alevin yüzeye oturmasını yavaşlatır. Aloe vera jeli, pirinç kabuğu külü (ince ve kalın), yumurta kabuğu tozu, ksantan gam. Ölçüm YTÜ Merkezi Araştırma Laboratuvarı TGA-DSC ve FTIR. Pik: kaplamasız 399 °C, taze 424 °C, 3,5 ay 438 °C, saf karışım 429,9 °C. Kütle kaybı hızı: kaplamasız −%20,28/dk, taze −%6,81/dk, 3,5 ay −%8,93/dk, saf karışım −%0,17/dk. 600 °C kalan: kaplamasız %16,66, taze %21,05, 3,5 ay %18,71, saf karışım %96,71. FTIR: taze kaplamada odun imzası örtülür; yaşlanınca yeniden belirir. Yenileme üç ay; pano 60–90 gün bandı gösterir.
 
-ASİSTAN: Üç kip, etiket Hızlı cevaplar / Orta cevaplar / Derin cevaplar. İstek aynı siteden /v1/chat/completions. Adres yazılmaz.`
+ASİSTAN: Üç kip, etiket Hızlı cevaplar / Orta cevaplar / Derin cevaplar. İstek aynı siteden gider. Adres yazılmaz.`
 
 export function systemPrompt(kip) {
   const k = asChatKip(kip);
