@@ -352,6 +352,28 @@ class ChatGuardTests(unittest.TestCase):
         self.assertRegex(body, r"Hızlı cevaplar|üç kip")
         self.assertNotRegex(body, re.compile(r"qwen|gguf|Ollama", re.I))
 
+    def test_clamp_demo_threads_keeps_shared_chat(self):
+        out = P.clamp_demo_threads(
+            {
+                "threads": [
+                    {
+                        "id": "s1",
+                        "title": "AOG",
+                        "kip": "orta",
+                        "lines": [
+                            {"who": "sen", "text": "AOG nedir?"},
+                            {"who": "pi", "text": "LoRa ile izler."},
+                            {"who": "hack", "text": "x"},
+                        ],
+                    },
+                    {"id": "???", "lines": [{"who": "sen", "text": "y"}]},
+                ]
+            }
+        )
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["kip"], "orta")
+        self.assertEqual(out[0]["lines"][2]["who"], "sen")
+
 
 if __name__ == "__main__":
     unittest.main()

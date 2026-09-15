@@ -17,3 +17,4 @@ native/ios/build
 native/ios/**/xcuserdata
 *.xcuserstate
 .vercel
+pi/demo_threads.json

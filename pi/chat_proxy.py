@@ -457,6 +457,52 @@ def wrap_user(text):
     return "Soru:\n" + safe
 
 
+DEMO_THREADS = Path(AOG_MD).resolve().parent / "demo_threads.json"
+DEMO_MAX_BODY = 100000
+demo_lock = threading.Lock()
+
+
+def clamp_demo_threads(raw):
+    blob = raw.get("threads") if isinstance(raw, dict) else raw
+    if not isinstance(blob, list):
+        return []
+    out = []
+    for row in blob[:24]:
+        if not isinstance(row, dict):
+            continue
+        tid = re.sub(r"[^A-Za-z0-9_-]", "", str(row.get("id") or ""))[:40]
+        if not tid:
+            continue
+        lines = []
+        for line in row.get("lines") or []:
+            if not isinstance(line, dict):
+                continue
+            who = "pi" if line.get("who") == "pi" else "sen"
+            text = sanitize_user(line.get("text"), 2000)
+            if not text:
+                continue
+            lines.append({"who": who, "text": text})
+            if len(lines) >= 80:
+                break
+        title = sanitize_user(row.get("title"), 48) or "Yeni soru"
+        out.append({"id": tid, "title": title, "kip": as_kip(row.get("kip")), "lines": lines})
+    return out
+
+
+def read_demo_threads():
+    try:
+        data = json.loads(DEMO_THREADS.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return []
+    return clamp_demo_threads(data)
+
+
+def write_demo_threads(rows):
+    clean = clamp_demo_threads(rows)
+    DEMO_THREADS.write_text(json.dumps({"threads": clean}, ensure_ascii=False), encoding="utf-8")
+    return clean
+
+
 def prepare_chat(payload, kip):
     # Always replace client system with AOG.md + kip rule.
     kip = as_kip(kip)
@@ -1009,7 +1055,43 @@ class Handler(BaseHTTPRequestHandler):
                 },
             )
             return
+        if path == "/v1/demo-threads":
+            with demo_lock:
+                rows = read_demo_threads()
+            self._send(200, {"threads": rows})
+            return
         self._send(404, {"error": {"message": "Bu adres bulunamadı."}})
+
+    def do_PUT(self):
+        path = self.path.split("?", 1)[0]
+        if path != "/v1/demo-threads":
+            self._send(404, {"error": {"message": "Bu adres bulunamadı."}})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._send(400, {"error": {"message": "İstek okunamadı. Soruyu kısaltıp yeniden gönder."}})
+            return
+        if length < 1 or length > DEMO_MAX_BODY:
+            take_rate(peer_ip(self))
+            self._send(400, {"error": {"message": "İstek okunamadı. Soruyu kısaltıp yeniden gönder."}})
+            return
+        raw = self.rfile.read(length)
+        if not take_rate(peer_ip(self)):
+            self._send(
+                429,
+                {"error": {"message": "Çok sık istek geldi. Biraz bekleyip yeniden gönder."}},
+                extra={"Retry-After": RETRY_AFTER},
+            )
+            return
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._send(400, {"error": {"message": "İstek okunamadı. Soruyu kısaltıp yeniden gönder."}})
+            return
+        with demo_lock:
+            rows = write_demo_threads(payload)
+        self._send(200, {"ok": True, "threads": rows})
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]

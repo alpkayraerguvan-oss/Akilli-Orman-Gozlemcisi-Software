@@ -50,6 +50,8 @@ export const COPY = {
       sayfaAciliyor: "Sayfa açılıyor.",
       panoAciliyor: "Pano açılıyor.",
       hesapOkunuyor: "Hesap okunuyor.",
+      demo: "Demo",
+      demoCikis: "Demo kapat",
     },
     home: {
       slogan: "Kül Olmaya Mahkum Değil, AOG ile Korumaya Alınmış Yeşil Bir Gelecek!",
@@ -208,6 +210,7 @@ export const COPY = {
       panoLead: "Pano hesaba bağlıdır. Giriş yapmadan istasyon ekranı açılmaz.",
       asistanLead: "Sohbetler hesaba yazılır. Başka hesabın sohbeti bu tarayıcıda görünmez.",
       cihazLead: "Kutu ve cihaz sayfası hesaba bağlıdır. Giriş yapmadan cihaz ekranı açılmaz.",
+      demoHint: "Hesap açmadan gir. Demo sohbeti herkese açıktır; yazılanı diğer ziyaretçiler de görür.",
     },
     cookie: {
       title: "Çerez ve yurt dışı aktarım",
@@ -462,6 +465,8 @@ export const COPY = {
       sayfaAciliyor: "Loading page.",
       panoAciliyor: "Opening the board.",
       hesapOkunuyor: "Reading the account.",
+      demo: "Demo",
+      demoCikis: "Leave demo",
     },
     home: {
       slogan: "Not doomed to ash. With AOG a green future stays under watch.",
@@ -620,6 +625,7 @@ export const COPY = {
       panoLead: "The board is tied to an account. Sign in to open the station.",
       asistanLead: "Chats are stored for this account. Another account's chat does not show in this browser.",
       cihazLead: "The device page is tied to an account. Sign in to open it.",
+      demoHint: "Enter without an account. Demo chat is public; other visitors see what you write.",
     },
     cookie: {
       title: "Cookies and transfers abroad",

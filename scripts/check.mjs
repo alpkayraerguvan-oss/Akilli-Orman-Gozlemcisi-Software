@@ -16,6 +16,7 @@ import { deviceKind, isStandaloneDisplay, pwaPlatform } from "../src/pwa.js";
 import { packetLoadHint } from "../src/packetHint.js";
 import { chatLoadHint } from "../src/chatHint.js";
 import { looksLikeInjection } from "../src/chatGuard.js";
+import { chatOwnerId, DEMO_USER, readDemo, writeDemo } from "../src/demoFlag.js";
 import { pairHref, parseStation, STATION_STORAGE_KEY } from "../src/stationPair.js";
 import { COPY } from "../src/uiCopy.js";
 import { NAV_PACKS, DESKTOP_TABS } from "../src/navPacks.js";
@@ -488,6 +489,8 @@ test("chat kips hide model names and map tokens", async () => {
   const proxy = readFileSync(join(here, "../pi/chat_proxy.py"), "utf8");
   assert.match(proxy, /Always replace client system/);
   assert.match(proxy, /AOG.md ÖZET/);
+  assert.match(proxy, /\/v1\/demo-threads/);
+  assert.match(proxy, /clamp_demo_threads/);
   assert.doesNotMatch(proxy, /looks_like_direct_question/);
   assert.doesNotMatch(proxy, /has_system/);
   assert.match(proxy, /CHAT_CORS_ORIGIN/);
@@ -525,7 +528,10 @@ test("chat kips hide model names and map tokens", async () => {
   assert.doesNotMatch(asistan, /2500/);
   assert.doesNotMatch(asistan, /mdReply/);
   assert.doesNotMatch(asistan, /systemPrompt/);
-  assert.match(asistan, /useUser/);
+  assert.match(asistan, /chatOwnerId/);
+  assert.match(asistan, /DEMO_USER/);
+  const demoThreads = readFileSync(join(here, "../src/demoThreads.js"), "utf8");
+  assert.match(demoThreads, /\/v1\/demo-threads/);
   assert.match(asistan, /writeThreads\([\s\S]*userId/);
   const vercelChat = readFileSync(join(here, "../vercel.json"), "utf8");
   assert.match(vercelChat, /trycloudflare\.com\/v1\/:path\*/);
@@ -567,6 +573,9 @@ test("chat kips hide model names and map tokens", async () => {
   const gate = readFileSync(join(here, "../src/RequireAuth.jsx"), "utf8");
   assert.match(gate, /<SignIn/);
   assert.match(gate, /clerk-screen/);
+  assert.match(gate, /clerk-demo/);
+  assert.match(gate, /writeDemo\(true\)/);
+  assert.match(COPY.tr.chrome.demo, /^Demo$/);
   assert.match(gate, /appearance=\{clerkAppearance\}/);
   assert.doesNotMatch(gate, /GithubInClerk/);
   assert.match(app, /sso-callback/);
@@ -578,6 +587,26 @@ test("chat kips hide model names and map tokens", async () => {
   assert.doesNotMatch(vite, /VITE_PI_CHAT_URL/);
 });
 
+test("demo flag shares one owner id until Clerk signs in", () => {
+  const mem = new Map();
+  const storage = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => {
+      mem.set(k, String(v));
+    },
+    removeItem: (k) => {
+      mem.delete(k);
+    },
+  };
+  writeDemo(false, storage);
+  assert.equal(readDemo(storage), false);
+  assert.equal(chatOwnerId("", storage), "");
+  writeDemo(true, storage);
+  assert.equal(readDemo(storage), true);
+  assert.equal(chatOwnerId("", storage), DEMO_USER);
+  assert.equal(chatOwnerId("user_2x", storage), "user_2x");
+});
+
 test("kvkk notice covers controllers, chats, cookies, and US sale ban", () => {
   const blob = privacyBlob();
   assert.match(blob, /6698/);
@@ -585,7 +614,7 @@ test("kvkk notice covers controllers, chats, cookies, and US sale ban", () => {
   assert.match(blob, /aydınlatma/);
   assert.match(blob, /Defenders Of Green/);
   assert.match(blob, /Clerk/);
-  assert.match(blob, /sohbet/);
+  assert.match(blob, /Demo tuşu/);
   assert.match(blob, /hesaba/);
   assert.match(blob, /OpenStreetMap/);
   assert.match(blob, /çerez/);
@@ -790,8 +819,8 @@ test("production Clerk Frontend API is proxied through /__clerk", async () => {
   assert.match(edge, /matcher: "\/__clerk\/:path\*"/);
   assert.match(edge, /process\.env\.CLERK_SECRET_KEY/);
   assert.match(sw, /pathname\.startsWith\("\/__clerk"\)/);
-  assert.match(sw, /aog-shell-v13/);
-  assert.doesNotMatch(sw, /aog-shell-v12/);
+  assert.match(sw, /aog-shell-v14/);
+  assert.doesNotMatch(sw, /aog-shell-v13/);
   assert.match(sw, /if \(bypass\(url\)\) return;/);
   assert.match(proxy + fapi, /frontend-api\.clerk\.dev/);
   assert.doesNotMatch(proxy + fapi, /sk_live_|sk_test_/);

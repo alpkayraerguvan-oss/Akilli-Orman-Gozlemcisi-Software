@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/react";
 import { isStandaloneDisplay } from "./pwa.js";
 import { clerkAppearance, useClerkFlag } from "./clerkFlag.js";
+import { useDemo, writeDemo } from "./demoFlag.js";
 import { CookieBanner, FontConsent } from "./CookieBanner.jsx";
 import { LEGAL_LINKS } from "./legalPagesCopy.js";
 import { navPacks, overlayLinks } from "./navPacks.js";
@@ -28,9 +29,20 @@ function TabLinks({ tabs, onPick }) {
 
 function ClerkButtons() {
   const { isLoaded, isSignedIn } = useUser();
+  const demo = useDemo();
   const { copy } = useLang();
-  if (!isLoaded) return <span>{copy.chrome.hesap}</span>;
+  if (!isLoaded && !demo) return <span>{copy.chrome.hesap}</span>;
   if (isSignedIn) return <UserButton afterSignOutUrl="/" />;
+  if (demo) {
+    return (
+      <div className="nav-auth">
+        <span className="nav-demo">{copy.chrome.demo}</span>
+        <button type="button" className="hit ghost" onClick={() => writeDemo(false)}>
+          {copy.chrome.demoCikis}
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="nav-auth">
       <SignInButton mode="modal" appearance={clerkAppearance}>

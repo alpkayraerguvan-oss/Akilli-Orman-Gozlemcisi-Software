@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useLang } from "./lang.js";
 import { Shell } from "./SiteNav.jsx";
 import { clerkAppearance, useClerkFlag } from "./clerkFlag.js";
+import { useDemo, writeDemo } from "./demoFlag.js";
 import "./site.css";
 
 export function RequireAuth({
@@ -36,8 +37,12 @@ export function RequireAuth({
 
 function SignedGate({ children, product, title, lead }) {
   const { isLoaded, isSignedIn } = useUser();
+  const demo = useDemo();
   const location = useLocation();
   const { copy } = useLang();
+  if (demo && !isSignedIn) {
+    return children;
+  }
   if (!isLoaded) {
     return (
       <Shell product={product} footer={false}>
@@ -63,6 +68,16 @@ function SignedGate({ children, product, title, lead }) {
                 forceRedirectUrl={location.pathname}
                 fallbackRedirectUrl={location.pathname}
               />
+              <div className="clerk-demo">
+                <button
+                  type="button"
+                  className="hit"
+                  onClick={() => writeDemo(true)}
+                >
+                  {copy.chrome.demo}
+                </button>
+                <p>{copy.auth.demoHint}</p>
+              </div>
             </div>
           </header>
         </article>

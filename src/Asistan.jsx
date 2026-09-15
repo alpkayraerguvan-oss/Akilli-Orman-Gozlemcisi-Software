@@ -18,6 +18,8 @@ import {
   writeThreads,
 } from "./chatStore.js";
 import { chatLoadHint } from "./chatHint.js";
+import { chatOwnerId, DEMO_USER } from "./demoFlag.js";
+import { pullDemoThreads, pushDemoThreads } from "./demoThreads.js";
 import { INJECTION_HINT, looksLikeInjection } from "./chatGuard.js";
 import "./site.css";
 import "./asistan.css";
@@ -111,7 +113,7 @@ function isAbort(err) {
 export default function Asistan({ product = "software" }) {
   const { copy } = useLang();
   const { user } = useUser();
-  const userId = user?.id || "";
+  const userId = chatOwnerId(user?.id);
   const [params, setParams] = useSearchParams();
   const [kip, setKip] = useState("hizli");
   const [threads, setThreads] = useState([]);
@@ -122,6 +124,8 @@ export default function Asistan({ product = "software" }) {
   const endRef = useRef(null);
   const aliveRef = useRef(true);
   const inflight = useRef(new Map());
+  const busyRef = useRef("");
+  busyRef.current = busyId;
 
   useEffect(() => {
     aliveRef.current = true;
@@ -136,6 +140,29 @@ export default function Asistan({ product = "software" }) {
     setThreads(saved);
     setActiveId(saved[0]?.id || "");
     setErr({ id: "", text: "" });
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId !== DEMO_USER) return undefined;
+    let alive = true;
+    async function tick() {
+      try {
+        const remote = await pullDemoThreads();
+        if (!alive || busyRef.current) return;
+        const saved = writeThreads(remote, DEMO_USER);
+        if (!alive) return;
+        setThreads(saved);
+        setActiveId((cur) => cur || saved[0]?.id || "");
+      } catch {
+        /* kip host offline keeps local demo copy */
+      }
+    }
+    tick();
+    const id = setInterval(tick, 8000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
   }, [userId]);
 
   useEffect(() => {
@@ -161,6 +188,9 @@ export default function Asistan({ product = "software" }) {
 
   function saveThreads(next) {
     const saved = writeThreads(next, userId);
+    if (userId === DEMO_USER) {
+      pushDemoThreads(saved).catch(() => {});
+    }
     if (aliveRef.current) setThreads(saved);
     return saved;
   }
@@ -173,9 +203,7 @@ export default function Asistan({ product = "software" }) {
 
   function startThread() {
     const id = newThreadId();
-    setThreads((prev) =>
-      writeThreads([{ id, title: "Yeni sohbet", kip, lines: [] }, ...prev], userId),
-    );
+    setThreads((prev) => saveThreads([{ id, title: "Yeni sohbet", kip, lines: [] }, ...prev]));
     setActiveId(id);
     setErr({ id: "", text: "" });
     setQ("");
@@ -186,11 +214,7 @@ export default function Asistan({ product = "software" }) {
     inflight.current.get(id)?.abort();
     inflight.current.delete(id);
     if (busyId === id) setBusyId("");
-    const next = writeThreads(
-      threads.filter((row) => row.id !== id),
-      userId,
-    );
-    setThreads(next);
+    const next = saveThreads(threads.filter((row) => row.id !== id));
     if (id === activeId) setActiveId(next[0]?.id || "");
     if (err.id === id) setErr({ id: "", text: "" });
   }
@@ -212,7 +236,7 @@ export default function Asistan({ product = "software" }) {
       const list = has
         ? prev
         : [{ id, title: titleFromQuestion(text), kip, lines: [] }, ...prev];
-      return writeThreads(
+      return saveThreads(
         list.map((row) =>
           row.id === id
             ? {
@@ -223,7 +247,6 @@ export default function Asistan({ product = "software" }) {
               }
             : row,
         ),
-        userId,
       );
     });
     if (looksLikeInjection(text)) {

@@ -25,9 +25,9 @@ export const DATA_ROWS = [
   {
     category: "Asistan sohbeti",
     examples: "Soru, yanıt, kip",
-    purpose: "Asistanı bu tarayıcıda hesaba yazmak",
+    purpose: "Asistanı bu tarayıcıda hesaba yazmak. Demo tuşu ortak sohbeti Pi üzerinde tutar",
     basis: "Sözleşme ve açık rıza",
-    keep: "Bu tarayıcıdaki localStorage; sunucuya sohbet arşivi yazılmaz",
+    keep: "Hesaplı sohbet bu tarayıcıdaki localStorage. Demo sohbeti herkese açık ortak kayıttır",
   },
   {
     category: "Asistan iletimi",
@@ -204,7 +204,7 @@ export const PRIVACY_SECTIONS = [
     id: "sure",
     title: "Saklama",
     paragraphs: [
-      "Clerk hesabı silinene kadar durur. Sohbet, bu tarayıcının localStorage kaydı ve hesap kimliği ile sınırlıdır; sunucuya sohbet arşivi yazılmaz. Pi üzerinde soru geçici işlenir; kalıcı sohbet hesabı yoktur. Paketler panoda son 24 saattir. Çerez tercihi bu tarayıcıda kalır.",
+      "Clerk hesabı silinene kadar durur. Hesaplı sohbet bu tarayıcının localStorage kaydı ve hesap kimliği ile sınırlıdır. Demo tuşu ortak sohbeti Pi üzerinde tutar; o kayıt herkese açıktır. Pi üzerinde hesaplı soru geçici işlenir. Paketler panoda son 24 saattir. Çerez tercihi bu tarayıcıda kalır.",
     ],
   },
   {
