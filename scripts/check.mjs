@@ -362,7 +362,7 @@ test("chat kips hide model names and map tokens", async () => {
   assert.equal(kipTokens("hizli"), 192);
   assert.equal(kipTokens("orta"), 256);
   assert.equal(kipTokens("derin"), 320);
-  assert.equal(kipTemp("orta"), 0.65);
+  assert.equal(kipTemp("orta"), 0.75);
   const mem = new Map();
   globalThis.localStorage = {
     getItem: (k) => (mem.has(k) ? mem.get(k) : null),
@@ -521,13 +521,15 @@ test("chat kips hide model names and map tokens", async () => {
   assert.doesNotMatch(lookout, /title="sklearn"/);
   const asistan = readFileSync(join(here, "../src/Asistan.jsx"), "utf8");
   assert.match(asistan, /fetch\("\/v1\/chat\/completions"/);
-  assert.match(asistan, /mdReply/);
+  assert.match(asistan, /120000/);
+  assert.doesNotMatch(asistan, /2500/);
+  assert.doesNotMatch(asistan, /mdReply/);
   assert.doesNotMatch(asistan, /systemPrompt/);
   assert.match(asistan, /useUser/);
   assert.match(asistan, /writeThreads\([\s\S]*userId/);
   const vercelChat = readFileSync(join(here, "../vercel.json"), "utf8");
-  assert.match(vercelChat, /"destination": "\/api\/chat"/);
-  assert.doesNotMatch(vercelChat, /trycloudflare/);
+  assert.match(vercelChat, /trycloudflare\.com\/v1\/:path\*/);
+  assert.doesNotMatch(vercelChat, /"destination": "\/api\/chat"/);
   const { default: chatApi } = await import("../api/chat.js");
   const chatRes = await chatApi(
     new Request("https://akilli-orman-gozlemcisi-software.vercel.app/v1/chat/completions", {
@@ -788,8 +790,8 @@ test("production Clerk Frontend API is proxied through /__clerk", async () => {
   assert.match(edge, /matcher: "\/__clerk\/:path\*"/);
   assert.match(edge, /process\.env\.CLERK_SECRET_KEY/);
   assert.match(sw, /pathname\.startsWith\("\/__clerk"\)/);
-  assert.match(sw, /aog-shell-v12/);
-  assert.doesNotMatch(sw, /aog-shell-v11/);
+  assert.match(sw, /aog-shell-v13/);
+  assert.doesNotMatch(sw, /aog-shell-v12/);
   assert.match(sw, /if \(bypass\(url\)\) return;/);
   assert.match(proxy + fapi, /frontend-api\.clerk\.dev/);
   assert.doesNotMatch(proxy + fapi, /sk_live_|sk_test_/);

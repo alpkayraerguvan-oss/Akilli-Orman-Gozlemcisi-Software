@@ -31,7 +31,7 @@ export function kipTokens(kip) {
 }
 
 export function kipTemp(kip) {
-  const temp = { hizli: 0.55, orta: 0.65, derin: 0.7 };
+  const temp = { hizli: 0.4, orta: 0.75, derin: 0.95 };
   return temp[asChatKip(kip)];
 }
 

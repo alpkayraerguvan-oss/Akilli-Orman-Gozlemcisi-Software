@@ -6,7 +6,7 @@
     },
     {
       "source": "/v1/:path*",
-      "destination": "/api/chat"
+      "destination": "https://advocate-arena-climbing-contracting.trycloudflare.com/v1/:path*"
     },
     { "source": "/((?!api/|__clerk/).*)", "destination": "/index.html" }
   ],

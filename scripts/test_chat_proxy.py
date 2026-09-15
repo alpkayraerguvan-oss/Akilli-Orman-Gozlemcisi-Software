@@ -275,7 +275,7 @@ class ChatGuardTests(unittest.TestCase):
     def test_slim_payload_owns_sampling_and_varies_seed(self):
         first = P.slim_payload({"messages": [], "max_tokens": 999, "temperature": 0.05}, "orta")
         second = P.slim_payload({"messages": [], "max_tokens": 999, "temperature": 0.05}, "orta")
-        self.assertEqual(first["temperature"], 0.65)
+        self.assertEqual(first["temperature"], 0.75)
         self.assertEqual(first["top_p"], 0.92)
         self.assertNotEqual(first["seed"], second["seed"])
         self.assertLessEqual(first["max_tokens"], 256)

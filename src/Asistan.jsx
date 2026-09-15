@@ -7,13 +7,12 @@ import {
   asChatKip,
   CHAT_KIPS,
   chatModel,
+  cleanReply,
   kipTemp,
   kipTokens,
-  mdReply,
   newThreadId,
   readKip,
   readThreads,
-  cleanReply,
   titleFromQuestion,
   writeKip,
   writeThreads,
@@ -69,9 +68,12 @@ async function askPi(question, kip, signal) {
 }
 
 async function askChat(question, kip, signal) {
-  const local = cleanReply(mdReply(question), question);
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 2500);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ctrl.abort();
+  }, 120000);
   const onParent = () => ctrl.abort();
   signal?.addEventListener("abort", onParent);
   const canceled = () => {
@@ -85,10 +87,17 @@ async function askChat(question, kip, signal) {
     if (signal?.aborted) throw canceled();
     const text = String(raw || "").trim();
     if (text) return text;
-    return local;
+    const empty = new Error("empty");
+    empty.status = 502;
+    throw empty;
   } catch (err) {
     if (signal?.aborted) throw canceled();
-    return local;
+    if (timedOut || isAbort(err)) {
+      const fail = new Error("Kip yanıtı gecikti. Aynı soruyu tekrar gönder.");
+      fail.status = 504;
+      throw fail;
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", onParent);
@@ -235,12 +244,7 @@ export default function Asistan({ product = "software" }) {
       );
     } catch (e) {
       if (isAbort(e)) return;
-      const reply = cleanReply(mdReply(text), text);
-      saveThreads(
-        readThreads(userId).map((row) =>
-          row.id === id ? { ...row, lines: [...row.lines, { who: "pi", text: reply }] } : row,
-        ),
-      );
+      setErr({ id, text: chatLoadHint(e?.status, e?.message) });
     } finally {
       if (inflight.current.get(id) === ac) inflight.current.delete(id);
       setBusyId((cur) => (cur === id ? "" : cur));

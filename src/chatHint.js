@@ -23,7 +23,7 @@ export function chatLoadHint(status, message) {
     }
     return "Bu yanıt kipi henüz hazır değil. Biraz sonra yeniden dene.";
   }
-  if (code === 504 || /zaman aşımı/i.test(raw)) {
+  if (code === 504 || /zaman aşımı|gecikti/i.test(raw)) {
     return "Yanıt zaman aşımına uğradı. Hızlı cevapları dene veya biraz sonra yeniden gönder.";
   }
   if (code === 400 || /gövde json değil|istek geçersiz/i.test(raw)) {
