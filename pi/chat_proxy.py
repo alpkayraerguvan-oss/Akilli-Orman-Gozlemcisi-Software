@@ -33,6 +33,13 @@ DERIN_GGUF = os.environ.get(
     "/home/demir/aog-pi/models/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
 )
 LLAMA_PORT = int(os.environ.get("LLAMA_PORT", "18080"))
+INFER = os.environ.get("AOG_INFER", "").strip().lower()
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_KIPS = {
+    "hizli": os.environ.get("HIZLI_OLLAMA", "qwen3.5:0.8b"),
+    "orta": os.environ.get("ORTA_OLLAMA", "gemma3:1b"),
+    "derin": os.environ.get("DERIN_OLLAMA", "deepseek-r1:1.5b"),
+}
 TOKEN_CAP = {"hizli": 192, "orta": 256, "derin": 320}
 TEMP_KIP = {"hizli": 0.55, "orta": 0.65, "derin": 0.7}
 
@@ -275,6 +282,30 @@ class LimitBook:
 
 
 LIMITS = LimitBook()
+
+
+def infer_ollama():
+    return INFER in ("ollama", "1", "true", "yes")
+
+
+def kip_ready(kip):
+    if infer_ollama():
+        return ollama_has(kip)
+    return os.path.isfile(KIPS[kip]["gguf"])
+
+
+def ollama_has(kip):
+    want = OLLAMA_KIPS[kip]
+    try:
+        with urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=2) as res:
+            data = json.loads(res.read().decode("utf-8"))
+    except Exception:
+        return False
+    names = []
+    for row in data.get("models") or []:
+        names.append(str(row.get("name") or ""))
+        names.append(str(row.get("model") or ""))
+    return want in names
 
 
 def as_kip(raw):
@@ -619,6 +650,12 @@ def stop_child():
 
 def start_kip(kip):
     global child, current, loading
+    if infer_ollama():
+        if not ollama_has(kip):
+            return False
+        current = kip
+        loading = ""
+        return True
     spec = KIPS[kip]
     if not os.path.isfile(spec["gguf"]):
         return False
@@ -663,6 +700,12 @@ def start_kip(kip):
 def ensure(kip):
     global current
     spec = KIPS[kip]
+    if infer_ollama():
+        with lock:
+            ok = ollama_has(kip)
+            if ok:
+                current = kip
+            return ok
     with lock:
         running = (
             bool(current)
@@ -689,13 +732,30 @@ class LlamaBusy(Exception):
 
 def forward(kip, payload):
     spec = KIPS[kip]
-    body = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        f"http://127.0.0.1:{spec['port']}/v1/chat/completions",
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    if infer_ollama():
+        outbound = {
+            "model": OLLAMA_KIPS[kip],
+            "messages": payload.get("messages") or [],
+            "max_tokens": payload.get("max_tokens"),
+            "temperature": payload.get("temperature"),
+            "stream": False,
+            "think": False,
+        }
+        body = json.dumps(outbound).encode("utf-8")
+        req = urllib.request.Request(
+            f"{OLLAMA_URL}/v1/chat/completions",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+    else:
+        body = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{spec['port']}/v1/chat/completions",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
     try:
         with urllib.request.urlopen(req, timeout=180) as res:
             return json.loads(res.read().decode("utf-8"))
@@ -724,7 +784,9 @@ def hide_model(data, kip, question=""):
         )
         if "reasoning_content" in msg:
             msg["reasoning_content"] = ""
+        msg.pop("reasoning", None)
         choice["message"] = msg
+    data.pop("system_fingerprint", None)
     return data
 
 
@@ -823,7 +885,7 @@ class Handler(BaseHTTPRequestHandler):
             }
             self._send(200, hide_model(scoped, kip, prepared["question"]))
             return
-        if not os.path.isfile(KIPS[kip]["gguf"]):
+        if not kip_ready(kip):
             self._send(503, {"error": {"message": KIPS[kip]["missing"]}})
             return
         if not take_slot():
@@ -888,7 +950,8 @@ def main():
 
     signal.signal(signal.SIGTERM, handle)
     signal.signal(signal.SIGINT, handle)
-    threading.Thread(target=lambda: ensure("hizli"), daemon=True).start()
+    if not infer_ollama():
+        threading.Thread(target=lambda: ensure("hizli"), daemon=True).start()
     server = ThreadingHTTPServer((LISTEN, PORT), Handler)
     try:
         server.serve_forever()

@@ -305,6 +305,10 @@ class ChatGuardTests(unittest.TestCase):
         local = FakeHandler("127.0.0.1", {"CF-Connecting-IP": "9.9.9.9"})
         self.assertEqual(P.peer_ip(local), "9.9.9.9")
 
+    def test_kip_ready_without_infer_uses_gguf_path(self):
+        self.assertFalse(P.infer_ollama())
+        self.assertFalse(P.kip_ready("hizli"))
+
 
 if __name__ == "__main__":
     unittest.main()
