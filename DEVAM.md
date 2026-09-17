@@ -1,6 +1,6 @@
 # Kayıt — 18 Eylül 2026
 
-Claude Code ile frontend/backend/güvenlik taraması yapıldı, bulunan hatalar `fix/security-and-bug-fixes` dalında düzeltildi. Bu dosyada şifre, `sk_live_`, OAuth secret yok.
+Otomatik bir frontend/backend/güvenlik taraması yapıldı, bulunan hatalar `fix/security-and-bug-fixes` dalında düzeltildi. Bu dosyada şifre, `sk_live_`, OAuth secret yok.
 
 ## Yapılan düzeltmeler (kod içinde, testler geçiyor: 59 JS + 33 Python)
 
