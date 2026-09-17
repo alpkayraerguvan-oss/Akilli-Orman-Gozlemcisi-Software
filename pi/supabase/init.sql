@@ -1,6 +1,6 @@
 -- Vanilla Postgres + PostgREST roles for AOG on the Pi.
 
-create role authenticator noinherit login password 'aog_authenticator';
+create role authenticator noinherit login password :'authpw';
 create role anon nologin;
 create role authenticated nologin;
 create role service_role nologin;

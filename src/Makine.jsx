@@ -58,7 +58,8 @@ export default function Makine({ product = "software" }) {
           score: Number.isFinite(n) ? n : 0,
           model: String(data[0].model || ""),
         });
-      });
+      })
+      .catch(() => {});
     return () => {
       ignore = true;
     };

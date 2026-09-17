@@ -4,5 +4,6 @@
 *.css linguist-language=CSS
 *.ino linguist-language=Arduino
 *.sql linguist-language=SQL
+pi/AOG.md text eol=lf
 public/** linguist-vendored
 package-lock.json linguist-generated

@@ -7,10 +7,13 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import sys
 import time
 
-SECRET = "aog-local-jwt-secret-change-me-32bytes"
+SECRET = os.environ.get("AOG_JWT_SECRET")
+if not SECRET:
+    sys.exit("mint_jwt.py: set AOG_JWT_SECRET in the environment (same value as pi/supabase/.env)")
 
 
 def b64(raw: bytes) -> str:

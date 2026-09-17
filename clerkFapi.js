@@ -89,13 +89,23 @@ export function clerkFapiLocation(location) {
   return raw.replace(/https:\/\/frontend-api\.clerk\.(dev|services)/i, CLERK_PROXY_URL);
 }
 
+const ALLOWED_ORIGINS = new Set([
+  "https://akilli-orman-gozlemcisi-software.vercel.app",
+  ...(process.env.CLERK_PROXY_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
+]);
+
 export function clerkFapiResponseHeaders(upstream, request) {
   const out = new Headers(upstream);
   for (const name of RESPONSE_DROP) out.delete(name);
-  const origin =
-    request.headers.get("origin") || "https://akilli-orman-gozlemcisi-software.vercel.app";
-  out.set("Access-Control-Allow-Origin", origin);
-  out.set("Access-Control-Allow-Credentials", "true");
+  const origin = request.headers.get("origin");
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    out.set("Access-Control-Allow-Origin", origin);
+    out.set("Access-Control-Allow-Credentials", "true");
+    out.set("Vary", "Origin");
+  }
   const loc = out.get("Location") || out.get("location");
   if (loc) out.set("Location", clerkFapiLocation(loc));
   return out;

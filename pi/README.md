@@ -4,6 +4,8 @@ Raspberry Pi 5 (4 GB). LoRa alıcı Deneyap Kart 1A v2, I2C köle **0x2A**. Pi m
 
 Yerel tablo: `pi/supabase` (Postgres + PostgREST + Caddy `:8000`). PWA `VITE_SUPABASE_URL=http://192.168.68.61:8000`. Vercel HTTPS için tünel gerekir.
 
+Kurulumdan önce `pi/supabase/.env.example`'ı `pi/supabase/.env` olarak kopyala ve `AOG_PG_PASSWORD`, `AOG_AUTHENTICATOR_PASSWORD`, `AOG_JWT_SECRET` için gerçek rastgele değerler üret (örn. `openssl rand -base64 48`). Bu dosya olmadan `docker compose up` hata verir — sabit/varsayılan bir sır artık yok. `mint_jwt.py` çalıştırmadan önce aynı `AOG_JWT_SECRET`'i ortama al: `set -a; . .env; set +a; python3 mint_jwt.py service_role`. Caddy artık sadece `https://akilli-orman-gozlemcisi-software.vercel.app` origin'ine CORS izni veriyor (`*` değil).
+
 Alıcı USB ile Mac’te de durabilir; veri yolu I2C’dir. A4/A5 Arduino I2C değildir; kartın **SDA / SCL** (D10 / D11) pinlerini kullan.
 
 ## Asistan

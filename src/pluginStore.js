@@ -106,7 +106,11 @@ export function writePlugins(next) {
     piOn: added.includes("pi") ? Boolean(next.piOn ?? cur.piOn) : false,
     alarmMode: asMode(next.alarmMode ?? cur.alarmMode),
   };
-  localStorage.setItem(KEY, JSON.stringify(out));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(out));
+  } catch {
+    // Private browsing / quota-exceeded: keep the in-memory value, drop persistence.
+  }
   return out;
 }
 

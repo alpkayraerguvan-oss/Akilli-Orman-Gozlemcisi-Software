@@ -1,16 +1,25 @@
 import { asStationId } from "./stationPair.js";
 
+// Never hardcode a real project URL/key here — a fork/clone that forgets to
+// set env vars would otherwise talk to production by default. Fail loudly
+// instead, same policy as NTFY_TOPIC below.
 export const supabaseUrl = String(
   import.meta.env.VITE_SUPABASE_URL ||
     import.meta.env.NEXT_PUBLIC_Akilli_Orman_Gozlemcisi_SUPABASE_URL ||
-    "https://pffvskcoaqnzgvjbnlfj.supabase.co",
+    "",
 ).trim();
+if (!supabaseUrl) {
+  throw new Error("VITE_SUPABASE_URL is not set");
+}
 
 export const supabaseAnon = String(
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
     import.meta.env.NEXT_PUBLIC_Akilli_Orman_Gozlemcisi_SUPABASE_ANON_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmZnZza2NvYXFuemd2amJubGZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMzAyNzYsImV4cCI6MjEwMzgwNjI3Nn0.6gsxJcRHOFxEXWCncM57E6ktLPPL8ZhifLCjqr-1H5g",
+    "",
 ).trim();
+if (!supabaseAnon) {
+  throw new Error("VITE_SUPABASE_ANON_KEY is not set");
+}
 
 export const STATION_ID = asStationId(import.meta.env.VITE_STATION_ID) || "AOG-DEMO-1";
 

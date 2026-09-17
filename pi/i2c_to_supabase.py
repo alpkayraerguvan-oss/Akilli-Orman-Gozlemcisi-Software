@@ -39,6 +39,33 @@ def load_env(path: Path) -> dict[str, str]:
     return out
 
 
+# Physical sanity bounds. LoRa at 433 MHz carries no auth/crypto, so a
+# spoofed transmitter can send anything matching the magic byte — reject
+# frames whose fields fall outside what the actual sensors can report,
+# instead of trusting the wire and letting bogus values reach scores/ML.
+MQ9_MAX = 4095  # 12-bit ADC ceiling
+T_MIN_C = -20.0  # MAX6675 does not read usable sub-freezing values
+GPS_STATES = (0, 1, 2)
+
+
+def valid_row(row: dict) -> bool:
+    if row["gps"] not in GPS_STATES:
+        return False
+    if row["mq9"] < 0 or row["mq9"] > MQ9_MAX:
+        return False
+    if row["a8"] not in (0, 1) or row["a9"] not in (0, 1):
+        return False
+    if row["t"] < T_MIN_C:
+        return False
+    lat = row.get("lat")
+    if lat is not None and not (-90.0 <= lat <= 90.0):
+        return False
+    lon = row.get("lon")
+    if lon is not None and not (-180.0 <= lon <= 180.0):
+        return False
+    return True
+
+
 def unpack_frame(data: bytes) -> dict | None:
     if len(data) < 22 or data[0] != MAGIC:
         return None
@@ -64,6 +91,8 @@ def unpack_frame(data: bytes) -> dict | None:
     if hop:
         row["_hop"] = int(hop)
     row["_seq"] = int(seq)
+    if not valid_row(row):
+        return None
     return row
 
 

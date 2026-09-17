@@ -3,11 +3,32 @@ import { INJECTION_HINT, looksLikeInjection, sanitizeUser } from "../src/chatGua
 
 export const config = { runtime: "edge" };
 
-function json(status, payload) {
+function json(status, payload, extraHeaders) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
+    headers: { "Content-Type": "application/json; charset=utf-8", ...extraHeaders },
   });
+}
+
+// Best-effort per-warm-instance rate limit (edge instances aren't shared
+// across regions, but this still blunts a single-source burst/loop).
+const WINDOW_MS = 10_000;
+const MAX_PER_WINDOW = 8;
+const hits = new Map();
+
+function clientIp(request) {
+  const fwd =
+    request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for") || "";
+  return fwd.split(",")[0].trim() || "unknown";
+}
+
+function tooMany(ip) {
+  const now = Date.now();
+  const arr = (hits.get(ip) || []).filter((t) => now - t < WINDOW_MS);
+  arr.push(now);
+  hits.set(ip, arr);
+  if (hits.size > 5000) hits.clear();
+  return arr.length > MAX_PER_WINDOW;
 }
 
 function lastUser(payload) {
@@ -28,6 +49,13 @@ export default async function handler(request) {
   }
   if (request.method !== "POST") {
     return json(405, { error: { message: "İstek okunamadı. Soruyu kısaltıp yeniden gönder." } });
+  }
+  if (tooMany(clientIp(request))) {
+    return json(
+      429,
+      { error: { message: "Çok sık istek. Biraz sonra tekrar dene." } },
+      { "Retry-After": "10" },
+    );
   }
   let payload;
   try {
